@@ -21,7 +21,7 @@ from datasets import load_from_disk
 from ios.hug_ctc_live import DataCollatorCTCWithPadding
 from net.wav2vecforctc import Wav2Vec2ForCTC as Wav2Vec2ForCTCM
 from util.load_model_custom import load_model_unstrict
-from callback.early_stopping import CustomEarlyStoppingCallback
+from callbacks.early_stopping import CustomEarlyStoppingCallback
 #from io.wav2vec_seq_ctc import DataCollatorCTCWithPadding
 
 chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'

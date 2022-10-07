@@ -23,7 +23,7 @@ from datasets import load_from_disk
 from ios.w2v_ctc import Wav2VecDataset
 from net.wav2vecforctc import Wav2Vec2ForCTC as Wav2Vec2ForCTCM
 from util.load_model_custom import load_model_unstrict
-from callback.early_stopping import CustomEarlyStoppingCallback
+from callbacks.early_stopping import CustomEarlyStoppingCallback
 from collators.w2v_ctc import DataCollatorCTCWithPadding, CollatorCTC
 from trainers.custom_trainer import CustomTrainer
 
