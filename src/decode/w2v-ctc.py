@@ -138,8 +138,8 @@ if __name__ == '__main__':
     calculate_score_report(hypo_lst, tgt_lst)
     calculate_score_report(hypo_lst, tgt_lst, True)
     calculate_asr_scores(hypo_lst, tgt_lst)
-    wer = wer_metric.compute(predictions=hypo_lst, references=tgt_lst)
-    print("DIff: {}".format(wer))
+   # wer = wer_metric.compute(predictions=hypo_lst, references=tgt_lst)
+    #print("DIff: {}".format(wer))
     with open("hypos/H_1_LV.ctm", "w") as out:
         for uid,el in zip(uid_lst,hypo_lst):
             out.write("{} {}\n".format(uid, el))
