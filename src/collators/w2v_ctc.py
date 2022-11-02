@@ -85,11 +85,11 @@ class CollatorCTC:
             tgt_batch = self.processor(tgt, return_tensors="pt", padding=True)
 
         labels = tgt_batch["input_ids"].masked_fill(tgt_batch.attention_mask.ne(1), -100)
-
+     
         ##language id is start token? 
         #TODO how to implement codeswitching
         batch["labels"] = labels
-
+        
         if self.fp16:
             batch = {k:v if v.dtype!=torch.float32 else v.to(torch.float16) for k,v in batch.items()}
         if self.return_utt_ids:

@@ -92,7 +92,7 @@ def create_model(args, vocab_path):
     processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
     if args.load_model_path == None:
         model_orig = Wav2Vec2ForCTC.from_pretrained(
-             "facebook/wav2vec2-large-xlsr-53",#    "facebook/wav2vec2-base", 
+             "facebook/wav2vec2-base",#    "facebook/wav2vec2-base",  #"facebook/wav2vec2-large-xlsr-53"
              ctc_loss_reduction="mean", 
              pad_token_id=processor.tokenizer.pad_token_id,
         )
@@ -100,6 +100,7 @@ def create_model(args, vocab_path):
         model_orig.config.final_dropout = args.final_dropout
         print(model_orig.config)
         model = Wav2Vec2ForCTCM(model_orig.config, seed=args.seed)
+        model.config.mask_time_length =6
         #missing_keys, unexpected_keys = model.load_state_dict(model_orig.state_dict(),strict=True)
         #print("Missing keys: {} Unexpected keys: {}".format(missing_keys, unexpected_keys))
         model, keys_loaded, keys_not_loaded = load_model_unstrict(model, model_orig.state_dict())
@@ -109,6 +110,7 @@ def create_model(args, vocab_path):
 
     model.freeze_feature_encoder()
     processor.save_pretrained(args.model_path)
+    model.save_pretrained(args.model_path)
     print_model_size(model)
     return model, processor
 
@@ -132,11 +134,11 @@ def compute_metrics(pred):
 
 def train_test_dataset(args, processor):
     tr_dataset = Wav2VecDataset(args.tr_stm, fp16=True, threads=4, processor=processor, 
-				min_utt_length=3000,
+				min_utt_length=3000, max_utt_length=35000,
 				time_drop=args.time_drop, time_stretch=args.time_stretch)
 			
     val_dataset = Wav2VecDataset(args.val_stm, fp16=True, threads=4, processor=processor,
-				min_utt_length=3000, time_drop=False, time_stretch=False)
+				min_utt_length=3000, max_utt_length=35000, time_drop=False, time_stretch=False)
 
     tr_dataset.initialize(args.b_input, args.b_sample)
     val_dataset.initialize(args.b_input, args.b_sample)
