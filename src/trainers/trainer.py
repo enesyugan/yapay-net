@@ -28,21 +28,19 @@ def print_model(model):
 def init_train(device, trainer, gpus, args):
     print("{}; {}; ".format(device, gpus))
     if gpus <= 1:
-        d_model = copy.deepcopy(trainer.model)
-        print_model(d_model)
-        trainer.train_model(model=d_model, args=args, device=device)
+        print_model(trainer.model)
+        trainer.train_model(model=trainer.model, args=args, device=device)
     else:
         os.environ['MASTER_ADDR'] = 'localhost'
-        os.environ['MASTER_PORT'] = '12355'
+        os.environ['MASTER_PORT'] = str(trainer.com_port)
         dist.init_process_group("nccl", rank=device, world_size=gpus)
         torch.manual_seed(0)
-  
-        d_model = copy.deepcopy(trainer.model)
-        if device == 0: print_model(d_model)
+
+        if device == 0: print_model(trainer.model)
         trainer.train_dataset.partition(device, gpus)
         trainer.distributed = True
         trainer.printer = True if device==0 else False
-        trainer.train_model(model=d_model, args=args, device=device, dist=True)
+        trainer.train_model(model=trainer.model, args=args, device=device, dist=True)
     
         dist.destroy_process_group()
 
@@ -104,6 +102,9 @@ class Trainer:
         self.distributed = False
         self.label_smoother =  None
         self.printer = True
+
+        self.com_port = random.randint(10,300)*100
+        print("COM_PORT: {}".format(self.com_port))
 
         if not callable(self.data_collator) and callable(getattr(self.data_collator, "collate_batch", None)):
             raise ValueError("The `data_collator` should be a simple callable (function, class with `__call__`).")
@@ -259,12 +260,14 @@ class Trainer:
           #          num_labels =  torch.numel(l[l>0])
             l = inputs["labels"]
             num_labels = torch.numel(l[l>0])
-            
-            if self.gradient_accumulation_steps != 0 and self.distributed:
+          
+            if batch_i % self.gradient_accumulation_steps == 0 or last or self.gradient_accumulation_steps <=1 or not self.distributed:
+                tr_loss_step = self.training_step(model, inputs=inputs, opt=opt)
+            elif self.gradient_accumulation_steps > 1 and self.distributed:
                 with model.no_sync():
                     tr_loss_step = self.training_step(model, inputs=inputs, opt=opt)
             else:
-                tr_loss_step = self.training_step(model, inputs=inputs, opt=opt) 
+                print("THIS SHOULD NOT APPEAR")
 
             if torch.isnan(tr_loss_step.data): print("INF LOSS");continue
 
@@ -288,7 +291,7 @@ class Trainer:
                 log_tr_loss = 0.
                 log_tr_tokens = 0.
 
-        loss_per_batch = ep_tr_loss / data_len
+        loss_per_token = ep_tr_loss / ep_tr_tokens
         return loss_per_batch
 
     def training_step(self, model, inputs, opt):
