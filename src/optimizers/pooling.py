@@ -27,7 +27,7 @@ class EpochPool(object):
             shutil.rmtree(model_dir)
         os.mkdir(model_dir)
 
-        torch.save(model, os.path.join(model_dir, model_name))
+        torch.save(model, os.path.join(model_dir, model_name)+".pt")
         save_model(os.path.join(model_dir, model_name), epoch, model, optimizer=opt) 
         self.saves.sort(key=lambda e : e[0])
         print("pool: {}".format(self.saves))

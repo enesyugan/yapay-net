@@ -1,2 +1,20 @@
 This is a repo for NLP. Work in progress..... 
 Work on Code-Switching, Code-Sharing, Code-mixing coming ...
+
+
+Example run shell script
+
+CUDA_VISIBLE_DEVICES=0,1 $pythonCMD $pynndir/bin/test.py \
+                        `#--tr-scps $data_dir/mgb-data-tr.scp --tr-tgts $data_dir/mgb-data.bpe `\
+                        `#--val-scps $data_dir/tmp.scp --val-tgts $data_dir/mgb-data.bpe `\
+                        --tr-stm all-tr.stm --val-stm all-cv.stm \
+                        --bpe-model m.model     \
+                        --b-sample 400 --b-input 400000 --n-epoch 200 --fp16 \
+                        --save-steps 1000 --eval-steps 1000 \
+                        `#--grad-checkpointing `\
+                        `#--continue-training --load-model-path "./model/checkpoint-1000/" `\
+                        --grad-acc 3 --lr 0.002 --n-warmup 8000 --weight-decay 0.000006 \
+                        `#--early-stopping-patience 10 `\
+                        --spec-bar 6 --spec-ratio 0.5 --spec-drop --time-stretch \
+                        --log-steps 100 >&1 | tee run-seq2seq.log1
+
