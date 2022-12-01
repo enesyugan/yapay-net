@@ -111,11 +111,12 @@ def print_model_size(model):
 def create_model(args):
 
     s2s_lstm_config = Seq2SeqLstmConfig(pad_token_id=0)
-    if args.load_model_path == None:
-        model = Seq2SeqLstmModelForCausalLM(s2s_lstm_config)
-    else:
-        print("LOADING CHECKPOINT")
-        model = Seq2SeqLstmModelForCausalLM.from_pretrained(args.load_model_path)
+    model = Seq2SeqLstmModelForCausalLM(s2s_lstm_config)
+    #if args.load_model_path == None:
+    #    model = Seq2SeqLstmModelForCausalLM(s2s_lstm_config)
+    #else:
+    #    print("LOADING CHECKPOINT")
+    #    model = Seq2SeqLstmModelForCausalLM.from_pretrained(args.load_model_path)
 
   #  model.freeze_feature_encoder()
    # processor.save_pretrained(args.model_path)
@@ -268,6 +269,8 @@ if __name__ == '__main__':
 	early_abortion_trial=5,
 	fp16=True,
 	label_smooth=args.label_smooth,
+        load_model_path=args.load_model_path,
+        continue_training=args.continue_training,
 	dataloader_num_workers=4,
         eval_dataloader_num_workers=2,
 	)
