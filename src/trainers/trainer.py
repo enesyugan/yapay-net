@@ -103,7 +103,11 @@ class Trainer:
         self.label_smoother =  None
         self.printer = True
 
+        old_state = random.getstate()
+        random.seed(time.time())
         self.com_port = random.randint(10,300)*100
+        random.setstate(old_state)
+
         print("COM_PORT: {}".format(self.com_port))
 
         if not callable(self.data_collator) and callable(getattr(self.data_collator, "collate_batch", None)):
@@ -243,6 +247,7 @@ class Trainer:
         ep_tr_tokens = 0.
         log_tr_loss = 0.
         log_tr_tokens = 0.
+        acc_tokens = 0.
 
         log_time = time.time()
 
@@ -260,6 +265,7 @@ class Trainer:
           #          num_labels =  torch.numel(l[l>0])
             l = inputs["labels"]
             num_labels = torch.numel(l[l>0])
+            acc_tokens += num_labels
           
             if batch_i % self.gradient_accumulation_steps == 0 or last or self.gradient_accumulation_steps <=1 or not self.distributed:
                 tr_loss_step = self.training_step(model, inputs=inputs, opt=opt)
@@ -272,16 +278,17 @@ class Trainer:
             if torch.isnan(tr_loss_step.data): print("INF LOSS");continue
 
             if batch_i % self.gradient_accumulation_steps == 0 or last:
-                norm = num_labels if self.grad_norm else 1
+                norm = acc_tokens if self.grad_norm else 1
                 opt.step_and_update_lr(self.grad_clip, norm)
                 opt.zero_grad()
+                acc_tokens = 0.
 			
             ep_tr_loss += tr_loss_step.data.item()
             log_tr_loss += tr_loss_step.data.item()
             #if self.grad_norm: 
             ep_tr_tokens += num_labels; log_tr_tokens += num_labels
   
-            if batch_i % self.logging_steps == 0 and self.printer:
+            if batch_i % self.logging_steps == 0 and self.printer and batch_i != 0:
                 t_new = time.time()
                 ppl = math.exp(min(log_tr_loss/log_tr_tokens, 100))
                # ppl = log_tr_loss/log_tr_tokens
@@ -292,7 +299,7 @@ class Trainer:
                 log_tr_tokens = 0.
 
         loss_per_token = ep_tr_loss / ep_tr_tokens
-        return loss_per_batch
+        return loss_per_token
 
     def training_step(self, model, inputs, opt):
         model.train()
