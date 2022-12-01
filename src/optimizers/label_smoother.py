@@ -1,5 +1,10 @@
 
+import numpy as np
+import torch.nn as nn
+import torch
+from dataclasses import dataclass
 
+@dataclass
 class LabelSmoother:
 
     epsilon: float = 0.1

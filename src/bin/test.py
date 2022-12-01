@@ -73,10 +73,13 @@ parser.add_argument('--eval-steps', help="model will be evaluated every x steps"
 parser.add_argument('--n-epoch', help="how many epochs to train", type=int, default=100)
 parser.add_argument('--model-path', help='model saving path', default='model')
 parser.add_argument('--log-steps', help='log output every x steps', type=int, default=500)
+parser.add_argument('--grad-norm', help='divide gradient by updated tokens', action='store_true')
+parser.add_argument('--label-smooth', help='label smoothing value', type=float, default=0.)
+
 #load your pre-trained
 parser.add_argument('--load-model-path', help='checkpoint to continue training', default=None)
 parser.add_argument('--continue-training', help="continue training if False new training", action='store_true')
-parser.add_argument('--grad-norm', help='divide gradient by updated tokens', action='store_true')
+
 
 ###Callbacks
 parser.add_argument('--early-stopping-patience', help="stop after missing x times; -1 disable", type=int, default=-1)
@@ -245,35 +248,6 @@ if __name__ == '__main__':
     wer_metric = load_metric("wer")
    ## bpe_dict = load_bpe(args.bpe_dict)
 
-    training_args = Seq2SeqTrainingArguments(
-      output_dir=args.model_path,
-      group_by_length=args.group_by_length,
-      length_column_name="audio_length",
-      per_device_train_batch_size=args.b_sample,
-      evaluation_strategy=IntervalStrategy.STEPS, #steps
-      label_smoothing_factor = 0.,
-      num_train_epochs=args.n_epoch,
-      fp16=True,
-      gradient_checkpointing=args.grad_checkpointing, 
-      save_steps=args.save_steps,
-      save_strategy = "steps",  ##use custom callback for save-x-best set to no
-      load_best_model_at_end=True,
-      metric_for_best_model = 'loss', #'ppl',
-      greater_is_better=False,
-      eval_steps=args.eval_steps,
-      logging_dir='logs',
-      logging_steps=args.log_steps,
-      learning_rate=args.lr,
-      weight_decay=args.weight_decay,
-      warmup_steps=args.n_warmup,
-      gradient_accumulation_steps=args.grad_acc,
-      eval_accumulation_steps=200,
-      save_total_limit=2,
-      dataloader_num_workers=8,
-      remove_unused_columns=False,
-      push_to_hub=False
-    )
-
     trainer = MyTrainer(
 	model=model,
 	learning_rate=args.lr,
@@ -293,6 +267,7 @@ if __name__ == '__main__':
 	save_total_limit=5,
 	early_abortion_trial=5,
 	fp16=True,
+	label_smooth=args.label_smooth,
 	dataloader_num_workers=4,
         eval_dataloader_num_workers=2,
 	)
