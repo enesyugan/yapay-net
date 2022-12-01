@@ -3,8 +3,8 @@ import os
 
 import torch
 
-def load_model(path, model, optimizer=None):
-    chkp_file = path + '/last-epoch.chkpt'
+def load_model(chkp_file, model, optimizer=None):
+   # chkp_file = path + '/last-epoch.chkpt'
     if not os.path.isfile(chkp_file):
         return 0, None
     dic = torch.load(chkp_file, map_location='cpu')
