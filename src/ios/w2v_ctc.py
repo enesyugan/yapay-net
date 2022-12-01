@@ -29,7 +29,8 @@ def path_to_lang_local(id):
 class Wav2VecDataset(Dataset):
     def __init__(self, stm_path, fp16, threads, processor, sort=True,
                  n_seq_max_epoch=-1, return_utt_ids=False, return_cleartext=False,
-		 path_to_lang=None, min_utt_length=0,
+		 path_to_lang=None, min_utt_length=0, max_utt_length=25000,
+  		 max_target_length=100000000,
 		 time_drop=False, time_stretch=False,
                  cased_labels=False):
 
@@ -49,7 +50,10 @@ class Wav2VecDataset(Dataset):
         self.time_stretch = time_stretch
         self.time_drop = time_drop
         self.min_utt_length = min_utt_length
+        self.max_utt_length = max_utt_length
+        self.max_target_length = max_target_length
         self.sort = sort
+        self.audio_lengths = list()
         ## same cv set for all trainings
 
         random.seed(42)
@@ -105,12 +109,13 @@ class Wav2VecDataset(Dataset):
                     continue                
                 self.stm_lines += 1
                 utt_id, path, start, end, utt_len, tgt  = tokens[0:6]
-                utt_len = int(float(utt_len)) *16
+                utt_len = int(float(utt_len)) #*16
                 if utt_len <= 0:
                     print("Wrong length for utt: {}".format(utt_id))
                    # utt_len = self._read_length(path, start, end=0)
                    # print(utt_len)
                 tgt = tgt.strip()
+                if len(tgt) > self.max_target_length: self.failed_wavs +=1; continue;
                 #start, end = float(start), float(end)
                 #tgt = " ".join(tokens[5:])
                 if not self.cased_labels: tgt = tgt.lower()
@@ -122,7 +127,7 @@ class Wav2VecDataset(Dataset):
                       #   with open(len_path, "a+") as lf:
                       #       lf.write(f"{utt_id} {utt_len} \n")
 
-                if utt_len<self.min_utt_length or tgt=="": self.failed_wavs += 1; continue;          
+                if utt_len<self.min_utt_length or tgt=="" or utt_len > self.max_utt_length: self.failed_wavs += 1; continue;          
                 #utts[utt_id] = (utt_id, path, pos, utt_len)
                 utts.append((utt_id, path, utt_len, tgt.strip()))                  
                 self.total_utts += 1
@@ -130,8 +135,10 @@ class Wav2VecDataset(Dataset):
             #utts = {utt_id: (utt_id, path, pos, utt_len) for utt_id, (utt_id, path, pos, utt_len) in sorted(utts.items(), key=lambda item: item[1][3])}
         utts = sorted(utts, key=lambda item: item[2]) if self.sort else utts
         self.stm_set = utts
+        self.audio_length = [utt[2] for utt in self.stm_set]      
+        self.column_names = ["audio_length"]
         #self.stm_set_length[stm_set] = len(utts)-1
-        print("{}/{} rest had audio length <{} or text=''".format(self.total_utts, self.stm_lines, self.min_utt_length))
+        print("{}/{} rest had audio length <{} or text='' or length>{}".format(self.total_utts, self.stm_lines, self.min_utt_length, self.max_utt_length))
 
 
     def partition(self, rank, parts):
@@ -152,7 +159,6 @@ class Wav2VecDataset(Dataset):
         #if self.utt_lbl is not None:
         #    return
         self.total_labels = 0
-
         print("WAVs not found #{}".format(self.failed_wavs)) 
         #self.print('%d label sequences loaded.' % len(self.utt_lbl))
         self.print('Creating batches.. ', end='')
@@ -175,7 +181,7 @@ class Wav2VecDataset(Dataset):
 
     def create_batch(self, b_input, b_sample):
         utts = self.stm_set
-              
+
         lst = list()   
         for j, utt in enumerate(utts):
             lst.append((j, utt[2]))
@@ -227,13 +233,20 @@ class Wav2VecDataset(Dataset):
         return len(self.stm_set)
 
     def __getitem__(self, index):
-        uid, path, _, lbl = self.stm_set[index] #uid, wavpath, length, text 
+        if type(index) == str: return self.audio_length
+        uid, path, audio_length, lbl = self.stm_set[index] #uid, wavpath, length, text 
 
         audio, sr = sf.read(path)
 
         if self.time_stretch: audio = self.time_stretch_inst(audio)
         if self.time_drop: audio = self.time_drop_inst(audio)
-
+#        data= {
+#		"uid": uid,
+#		"audio": audio,
+#		"audio_length": audio_length,
+#		"lbl": lbl,
+#		"path": path,
+#		}
         return uid, audio, lbl, path
 
     def time_drop_inst(self, inst, num=20, time_drop=0.2):
@@ -303,4 +316,5 @@ class Wav2VecDataset(Dataset):
             batch['utt_ids'] = uid
         if self.return_cleartext:
             batch['text'] = tgt
+
         return batch
