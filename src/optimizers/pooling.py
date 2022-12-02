@@ -18,7 +18,7 @@ class EpochPool(object):
             print(f"missed {self.acc_miss}/{self.trial}")
             return
         self.acc_miss=0
-        if os.path.isfile(highest_err[1]):
+        if os.path.exists(highest_err[1]):
             shutil.rmtree(highest_err[1])#os.remove(highest_err[1])
 
         self.saves[-1] = (err, model_dir)
