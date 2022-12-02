@@ -2,6 +2,9 @@ This is a repo for NLP. Work in progress.....
 Work on Code-Switching, Code-Sharing, Code-mixing coming ...
 
 
+###
+Model needs to return dict or tuple with first value beeing the loss
+
 Example run shell script
 
 CUDA_VISIBLE_DEVICES=0,1 $pythonCMD $pynndir/bin/test.py \
@@ -18,3 +21,13 @@ CUDA_VISIBLE_DEVICES=0,1 $pythonCMD $pynndir/bin/test.py \
                         --spec-bar 6 --spec-ratio 0.5 --spec-drop --time-stretch \
                         --log-steps 100 >&1 | tee run-seq2seq.log1
 
+
+
+stm-Format: 
+uid	wav_path	from	to	length/to-from	transcript
+
+
+#TODO
+	-Support Datasets which do not create their own batches (Single & DDP)
+	-Add inference script
+	-Change collators to enable using not clipped audio files meaning. Transcript corresponds to wav-file 10sec to 12sec currently it needs to be full wav-file
