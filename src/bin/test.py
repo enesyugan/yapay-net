@@ -245,7 +245,15 @@ if __name__ == '__main__':
 		spec_bar=args.spec_bar, 
 		spec_ratio=args.spec_ratio
 		)#,
-    
+    eval_data_collator = CollatorScpOnTheFly(
+		sp=sp,
+		sort_src=True,
+		fp16=True,
+		return_dict=False,
+		time_stretch=False,
+		spec_drop=False,
+		)
+
     wer_metric = load_metric("wer")
    ## bpe_dict = load_bpe(args.bpe_dict)
 
@@ -258,6 +266,7 @@ if __name__ == '__main__':
         args=args,
 	num_train_epochs=args.n_epoch,
         data_collator=data_collator,
+	eval_data_collator=eval_data_collator,
 	grad_norm=args.grad_norm,
 	grad_clip=0.,
 	warmup_steps=args.n_warmup,

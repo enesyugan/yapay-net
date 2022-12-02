@@ -55,6 +55,7 @@ class Trainer:
         args,	
 	num_train_epochs,
 	data_collator,
+	eval_data_collator=None,
 	grad_norm=False,	
         grad_clip=0.,
 	label_smooth=0.,
@@ -82,6 +83,7 @@ class Trainer:
         self.output_dir = output_dir
         self.num_train_epochs = num_train_epochs
         self.data_collator = data_collator
+        self.eval_data_collator = eval_data_collator if eval_data_collator != None else data_collator
         self.grad_norm = grad_norm
         self.grad_clip = grad_clip
         self.label_smooth = label_smooth
@@ -112,27 +114,6 @@ class Trainer:
 
         if not callable(self.data_collator) and callable(getattr(self.data_collator, "collate_batch", None)):
             raise ValueError("The `data_collator` should be a simple callable (function, class with `__call__`).")
-
-
-    def __init_train(self, device, gpus, args):
-        print("{}; {}; ".format(device, gpus))
-        if gpus <= 1:
-            d_model = copy.deepcopy(self.model)
-            print_model(d_model)
-            self.train_model(model=d_model, args=args, device=device)
-        else:
-            os.environ['MASTER_ADDR'] = 'localhost'
-            os.environ['MASTER_PORT'] = '12355'
-            dist.init_process_group("nccl", rank=device, world_size=gpus)
-            torch.manual_seed(0)
-      
-            d_model = copy.deepcopy(self.model)
-            if device == 0: print_model(d_model)
-            self.train_dataset.partition(device, gpus)
-            self.distributed = True
-            self.train_model(model=d_model, args=args, device=device, dist=True)
-        
-            dist.destroy_process_group()
 
 
     def train(self):
@@ -208,7 +189,8 @@ class Trainer:
 
     def __get_eval_dataloader(self, eval_dataset):
         batches = eval_dataset.batches.copy()
-        loader = DataLoader(eval_dataset, batch_sampler=batches, collate_fn=self.data_collator,
+
+        loader = DataLoader(eval_dataset, batch_sampler=batches, collate_fn=self.eval_data_collator,
                             num_workers=self.eval_dataloader_num_workers, pin_memory=False)
         return loader
 
@@ -254,7 +236,7 @@ class Trainer:
 
         for batch_i, inputs in enumerate(train_dataloader):
             last = (batch_i == data_len)
-          #  if batch_i > 10: break
+            #if batch_i > 10: break
             inputs = self._prepare_inputs(inputs, device)
              
           #  if self.grad_norm:
