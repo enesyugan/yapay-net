@@ -335,7 +335,7 @@ class Seq2SeqLSTMDecoder(nn.Module):
         if config.shared_emb: self.embed_tokens.weight = self.output.weight
         self.pack = config.pack_batch
 
-    def forward(self, input_ids, encoder_hidden_states, encoder_attention_mask, hid=None, output_attentions=False, return_dict=None):
+    def forward(self, input_ids, encoder_hidden_states, encoder_attention_mask, hid=None, output_attentions=False, return_dict=None, **kwargs):
         dec_seq = input_ids
         enc_out = encoder_hidden_states
         dec_emb = self.embed_tokens(dec_seq) * self.scale
@@ -599,3 +599,50 @@ class Seq2SeqLstmModelForCausalLM(Seq2SeqLstmPreTrainedModel):
             cross_attentions=outputs[1],
             encoder_hidden_states=outputs[5],
         )
+
+    def encode(
+	self,
+	input_features: torch.LongTensor = None,
+	attention_mask: Optional[torch.Tensor] = None,
+	decoder_input_ids: Optional[torch.LongTensor] = None,
+        encoder_outputs: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
+	output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+	labels: Optional[torch.LongTensor] = None,
+        use_cache=None,
+        return_dict: Optional[bool] = None,
+	):
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if encoder_outputs is None:
+            encoder_outputs = self.model.encoder(
+                                input_features,
+                                attention_mask=attention_mask,
+                                return_dict=return_dict,
+                                )
+
+        return encoder_outputs
+
+    def decode(
+	self, 
+	decoder_input_ids, 
+	last_hidden_state,
+	encoder_output_mask,
+	hid=None, 
+	output_attentions=False, 
+	return_dict=None, 
+	**kwargs
+	):
+ 
+        decoder_outputs = self.model.decoder(
+                                input_ids=decoder_input_ids,
+                                encoder_hidden_states=last_hidden_state,
+                                encoder_attention_mask=encoder_output_mask,
+                                return_dict=return_dict,
+                                )	
+        lm_logits = self.proj_out(decoder_outputs[0])	
+        logit = lm_logits[:,-1,:].squeeze(1)
+
+        return torch.log_softmax(logit, -1)
+
+		
