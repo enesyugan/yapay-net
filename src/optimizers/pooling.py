@@ -11,7 +11,11 @@ class EpochPool(object):
         self.acc_miss=0
         self.trial=trial
 
-    def save(self, err, model_dir, model_name, model, opt, epoch):
+    def save(self, err, model_dir, model_name, model, opt, epoch, distributed=False):
+        if distributed:
+            model_to_save = model.module
+        else:
+            model_to_save = model
         highest_err = self.saves[-1]
         if highest_err[0] < err:
             self.acc_miss+=1
@@ -22,13 +26,13 @@ class EpochPool(object):
             shutil.rmtree(highest_err[1])#os.remove(highest_err[1])
 
         self.saves[-1] = (err, model_dir)
-        #torch.save(model.state_dict(), path)
+
         if os.path.exists(model_dir):
             shutil.rmtree(model_dir)
         os.mkdir(model_dir)
 
-        torch.save(model, os.path.join(model_dir, model_name)+".pt")
-        save_model(os.path.join(model_dir, model_name), epoch, model, optimizer=opt) 
+        torch.save(model_to_save, os.path.join(model_dir, model_name)+".pt")
+        save_model(os.path.join(model_dir, model_name), epoch, model_to_save, optimizer=opt) 
         self.saves.sort(key=lambda e : e[0])
         print("pool: {}".format(self.saves))
 

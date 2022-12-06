@@ -6,12 +6,15 @@ import copy
 import random
 from collections.abc import Mapping
 import math
+import sys
+import signal
 
 import torch
 from torch.utils.data import DataLoader
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.cuda.amp import autocast
+
 
 from optimizers.optimizer import ScheduledOptim
 from optimizers.pooling import EpochPool
@@ -39,7 +42,7 @@ def init_train(device, trainer, gpus, args):
         if device == 0: print_model(trainer.model)
         trainer.train_dataset.partition(device, gpus)
         trainer.distributed = True
-        trainer.printer = True if device==0 else False
+        trainer.printer = True if device==0 else False        
         trainer.train_model(model=trainer.model, args=args, device=device, dist=True)
     
         dist.destroy_process_group()
@@ -120,14 +123,17 @@ class Trainer:
         self.n_gpu = torch.cuda.device_count()
         if torch.cuda.device_count() > 1:
             gpus = torch.cuda.device_count()
-            print('Training with distributed data parallel. Number of devices: %d' % gpus)          
-            mp.spawn(init_train, nprocs=gpus, args=(self, gpus, self.args), join=True)
+            print('Training with distributed data parallel. Number of devices: %d' % gpus)  
+            try:        
+                mp.spawn(init_train, nprocs=gpus, args=(self, gpus, self.args), join=True)
+            except Exception as e:
+                print(e)
         else:
             device = 0 if torch.cuda.is_available() else torch.device('cpu')
             init_train(device, self, 1, self.args)
 
           
-    def train_model(self, model, args, device, dist=False):
+    def train_model(self, model, args, device, dist=False):        
         opt = ScheduledOptim(self.warmup_steps, self.const_steps, self.learning_rate)
         model = opt.initialize(model, device, weight_decay=self.weight_decay, dist=dist)
 
@@ -135,27 +141,33 @@ class Trainer:
             self.label_smoother = LabelSmoother(epsilon=self.label_smooth)
    
         pool = EpochPool(save=self.save_total_limit, trial=self.early_abortion_trial)
+
         epoch_i = 0
         if self.load_model_path:
             if self.continue_training:
-                epoch_i = load_model(self.load_model_path, model, optimizer=opt)
+                epoch_i = load_model(self.load_model_path, model, optimizer=opt, distributed=dist)
             else:
-                epoch_i = load_model(self.load_model_path, model)
+                epoch_i = load_model(self.load_model_path, model, distributed=dist)
 
         epoch_init = epoch_i
         while epoch_i < self.num_train_epochs:
             epoch_i += 1
             self.train_dataset.set_epoch(epoch_i)
+
             if self.printer: print('[ Epoch', epoch_i, ']')
             start = time.time()
-            train_loss = self.__inner_train_loop(model, opt, device)
             
-            if dist and device > 0: continue
+            train_loss = self.__inner_train_loop(model, opt, device)
+
+            if dist and device > 0:  continue
+
             print('  (Training)   ppl: {:8.5f}, loss: {:8.5f}, elapse: {:3.3f} min'.format(
                  math.exp(min(train_loss, 100)), train_loss, (time.time()-start)/60))
 
             start = time.time()
+
             eval_loss  = self.__inner_eval_loop(model, device)
+
             print('  (Validation) ppl: {:8.5f}, loss: {:8.5f}, elapse: {:3.3f} min'.format(
                      math.exp(min(eval_loss, 100)), eval_loss, (time.time()-start)/60))
 
@@ -164,10 +176,11 @@ class Trainer:
            # model_file = self.output_dir + '/epoch-{}.pt'.format(epoch_i)
             model_name = 'epoch-{}'.format(epoch_i)
             model_dir = os.path.join(self.output_dir, model_name)
-            pool.save(eval_loss, model_dir, model_name, model, opt, epoch_i)
+            
+            pool.save(eval_loss, model_dir, model_name, model, opt, epoch_i, distributed=dist)
 
             if pool.break_train():
-                if epoch_i - epoch_init > 5: break #8
+                if epoch_i - epoch_init > 0: print("Training finished", flush=True);pid = os.getpid(); os.kill(pid, signal.SIGTERM);
                 else: pool.reset_acc_miss()
 
 
@@ -295,8 +308,8 @@ class Trainer:
         if torch.isnan(loss.data):
             print("    inf loss "); return loss.detach()
 
-        if self.n_gpu > 1:
-            loss = loss.mean()
+        #if self.n_gpu > 1:
+         #   loss = loss.mean()
 
         if self.gradient_accumulation_steps > 1:
             loss = loss #/ self.gradient_accumulation_steps
